@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5" }
+# version = "4.5.28"은 오류가 발생한다.
+clap = { version = "=4.5.27", features = ["derive"] }
 
 [dev-dependencies]
 anyhow = { version = "1.0" }

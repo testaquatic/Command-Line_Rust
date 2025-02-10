@@ -20,9 +20,6 @@ fn runs() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-const HELLO_ARGS1: [&str; 1] = ["Hello there"];
-const HELLO_ARGS2: [&str; 2] = ["Hello", "there"];
-
 fn run(args: &[&str], expected_file: &str) -> Result<(), anyhow::Error> {
     let expected = fs::read_to_string(expected_file)?;
     let output = Command::cargo_bin("echor")?.args(args).output()?;
