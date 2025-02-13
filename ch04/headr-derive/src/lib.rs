@@ -3,58 +3,25 @@ use std::{
     io::{self, BufRead, BufReader, Read},
 };
 
-use clap::{value_parser, Arg, Command};
+use clap::{value_parser, Parser};
 
-#[derive(Debug)]
+#[derive(Debug, Parser)]
+#[command(name = "headr", version, author, about)]
 pub struct Args {
+    /// 입력 파일
+    #[arg(default_value = "-", value_name = "FILE")]
     files: Vec<String>,
+
+    /// 줄 수
+    #[arg(short('n'), long, default_value = "10", value_name = "LINES", value_parser = value_parser!(u64).range(1..))]
     lines: u64,
+
+    /// 바이트수
+    #[arg(short('c'), long, value_name = "BYTES", conflicts_with("lines"), value_parser = value_parser!(u64).range(1.. ))]
     bytes: Option<u64>,
 }
 
 impl Args {
-    pub fn parse() -> Args {
-        let matches = Command::new("headr")
-            .version("0.1.0")
-            .author("TestAquatic")
-            .about("러스트로 만든 `head`")
-            .arg(
-                Arg::new("files")
-                    .help("Input file(s)")
-                    .value_name("FILE")
-                    .default_value("-")
-                    .num_args(0..),
-            )
-            .arg(
-                Arg::new("lines")
-                    .help("Number of lines")
-                    .default_value("10")
-                    .short('n')
-                    .long("lines")
-                    .value_name("LINES")
-                    .value_parser(value_parser!(u64).range(1..))
-                    .conflicts_with("bytes"),
-            )
-            .arg(
-                Arg::new("bytes")
-                    .help("Number of bytes")
-                    .short('c')
-                    .long("bytes")
-                    .value_name("BYTES")
-                    .value_parser(value_parser!(u64).range(1..))
-                    .conflicts_with("lines"),
-            )
-            .get_matches();
-
-        Args {
-            // 인수의 개수를 1..으로 지정했으므로 unwrap을 사용해도 안전하다.
-            files: matches.get_many("files").unwrap().cloned().collect(),
-            // 기본값이 지정되어 있으므로 unwrap을 사용해도 안전하다.
-            lines: matches.get_one("lines").cloned().unwrap(),
-            bytes: matches.get_one("bytes").cloned(),
-        }
-    }
-
     pub fn run(self) -> Result<(), anyhow::Error> {
         let mut line_string = String::new();
         let f_len = self.files.len();
@@ -81,10 +48,10 @@ impl Args {
 
                 Some(f)
             })
-            .filter_map(|mut f| match self.bytes {
+            .map(|mut f| match self.bytes {
                 Some(c) => {
                     let mut bytes = vec![0; c as usize];
-                    let mut bytes_stop = 0 as usize;
+                    let mut bytes_stop = 0;
 
                     // 책의 코드로 변경함
                     loop {
@@ -99,14 +66,14 @@ impl Args {
                             // 재시도할 수 있는 오류
                             Err(e) if e.kind() == io::ErrorKind::Interrupted => (),
                             // 오류가 발생하면 읽기 중지
-                            Err(e) => return Some(Err(e)),
+                            Err(e) => return Err(e),
                         }
                     }
 
                     let s = String::from_utf8_lossy(&bytes[..bytes_stop]);
                     print!("{s}");
 
-                    Some(Ok(()))
+                    Ok(())
                 }
                 None => {
                     let line_result = (0..self.lines)
@@ -125,8 +92,8 @@ impl Args {
                         });
 
                     match line_result {
-                        Ok(_) => Some(Ok(())),
-                        Err(e) => Some(Err(e)),
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
                     }
                 }
             })
