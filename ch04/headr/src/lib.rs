@@ -81,10 +81,10 @@ impl Args {
 
                 Some(f)
             })
-            .filter_map(|mut f| match self.bytes {
+            .map(|mut f| match self.bytes {
                 Some(c) => {
                     let mut bytes = vec![0; c as usize];
-                    let mut bytes_stop = 0 as usize;
+                    let mut bytes_stop = 0;
 
                     // 책의 코드로 변경함
                     loop {
@@ -99,14 +99,14 @@ impl Args {
                             // 재시도할 수 있는 오류
                             Err(e) if e.kind() == io::ErrorKind::Interrupted => (),
                             // 오류가 발생하면 읽기 중지
-                            Err(e) => return Some(Err(e)),
+                            Err(e) => return Err(e),
                         }
                     }
 
                     let s = String::from_utf8_lossy(&bytes[..bytes_stop]);
                     print!("{s}");
 
-                    Some(Ok(()))
+                    Ok(())
                 }
                 None => {
                     let line_result = (0..self.lines)
@@ -125,8 +125,8 @@ impl Args {
                         });
 
                     match line_result {
-                        Ok(_) => Some(Ok(())),
-                        Err(e) => Some(Err(e)),
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
                     }
                 }
             })
