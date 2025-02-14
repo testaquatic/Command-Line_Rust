@@ -3,12 +3,20 @@ use std::{
     io::{self, BufRead, BufReader, BufWriter, Write},
 };
 
-use clap::{Arg, ArgAction};
+use clap::{Arg, ArgAction, Parser};
 
-#[derive(Debug)]
+#[derive(Debug, Parser)]
+#[command(author, version, about)]
+/// `uniq`의 러스트 버전
 pub struct Args {
+    /// 입력 파일
+    #[arg(value_name = "IN_FILE", default_value = "-")]
     in_file: String,
+    /// 출력 파일
+    #[arg(value_name = "OUT_FILE")]
     out_file: Option<String>,
+    /// 횟수를 보여준다.
+    #[arg(short, long)]
     count: bool,
 }
 
