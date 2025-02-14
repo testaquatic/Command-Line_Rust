@@ -3,7 +3,7 @@ use std::{
     io::{self, BufRead, BufReader},
 };
 
-use clap::{ArgAction, Command};
+use clap::{ArgAction, Command, Parser};
 
 #[derive(Debug, PartialEq)]
 struct FileInfo {
@@ -114,68 +114,32 @@ impl<'a> FileInfoPrint<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Parser)]
+#[command(author, version, about)]
+/// `wc`의 러스트 버전
 pub struct Args {
+    /// 입력 파일
+    #[arg(value_name = "FILE", default_value = "-")]
     files: Vec<String>,
+
+    /// 줄 수를 보여준다.
+    #[arg(short, long)]
     lines: bool,
+
+    /// 단어 수를 보여준다.
+    #[arg(short, long)]
     words: bool,
+
+    /// 바이트 수를 보여준다.
+    #[arg(short('c'), long)]
     bytes: bool,
+
+    /// 문자 수를 보여준다.
+    #[arg(short('m'), long, conflicts_with("bytes"))]
     chars: bool,
 }
 
 impl Args {
-    pub fn parse() -> Self {
-        let matches = Command::new("wcr")
-            .version("0.1.0")
-            .author("TestAquatic")
-            .about("Rust version of `wc`")
-            .arg(
-                clap::Arg::new("files")
-                    .value_name("FILE")
-                    .num_args(0..)
-                    .default_value("-")
-                    .help("Input file(s)"),
-            )
-            .arg(
-                clap::Arg::new("lines")
-                    .short('l')
-                    .long("lines")
-                    .help("Show line count")
-                    .action(ArgAction::SetTrue),
-            )
-            .arg(
-                clap::Arg::new("words")
-                    .short('w')
-                    .long("words")
-                    .help("Show word count")
-                    .action(ArgAction::SetTrue),
-            )
-            .arg(
-                clap::Arg::new("bytes")
-                    .short('c')
-                    .long("bytes")
-                    .help("Show byte count")
-                    .action(ArgAction::SetTrue),
-            )
-            .arg(
-                clap::Arg::new("chars")
-                    .short('m')
-                    .long("chars")
-                    .help("Show character count")
-                    .action(ArgAction::SetTrue)
-                    .conflicts_with("bytes"),
-            )
-            .get_matches();
-
-        Self {
-            files: matches.get_many("files").unwrap().cloned().collect(),
-            lines: matches.get_flag("lines"),
-            words: matches.get_flag("words"),
-            chars: matches.get_flag("chars"),
-            bytes: matches.get_flag("bytes"),
-        }
-    }
-
     /// 인수를 조정한다.
     fn args_adjustment(&mut self) {
         if !(self.lines || self.words || self.bytes || self.chars) {
