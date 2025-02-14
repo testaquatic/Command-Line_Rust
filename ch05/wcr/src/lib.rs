@@ -14,6 +14,7 @@ struct FileInfo {
 }
 
 impl FileInfo {
+    /// 결과를 누적한다.
     fn add(&mut self, rhs: &Self) {
         self.num_lines += rhs.num_lines;
         self.num_words += rhs.num_words;
@@ -22,26 +23,33 @@ impl FileInfo {
     }
 }
 
+/// `FileInfo`의 내용을 stdout에 출력한다.
 #[derive(Debug)]
-struct PrintFileInfos<'a> {
+struct FileInfoPrint<'a> {
+    /// 파일이 여러개 일 때 사용하기 위한 벡터
     fileinfos: Vec<Vec<String>>,
+    /// 문자열의 최대길이
+    /// GNU버전은 지정이 필요하다.
     max: usize,
+    /// 출력할 항목을 선택하기 위한 참조자
     args: &'a Args,
 }
 
-impl<'a> PrintFileInfos<'a> {
-    fn new(args: &'a Args) -> PrintFileInfos<'a> {
-        PrintFileInfos {
+impl<'a> FileInfoPrint<'a> {
+    /// `FileInfoPrint`를 생성한다.
+    fn new(args: &'a Args) -> FileInfoPrint<'a> {
+        FileInfoPrint {
             fileinfos: Vec::new(),
             max: if args.files.len() > 1 { 3 } else { 0 },
             args,
         }
     }
 
+    /// 출력한 `FileInfo`를 추가한다.
     fn append(
         &mut self,
         filename: &str,
-        FileInfo {
+        &FileInfo {
             num_lines,
             num_words,
             num_bytes,
@@ -50,16 +58,18 @@ impl<'a> PrintFileInfos<'a> {
     ) {
         let mut line = Vec::new();
 
-        let mut line_item_add = |count: usize| {
-            line.push(count.to_string());
+        // 항목 추가를 쉽게 하기 위한 클로저
+        let mut line_item_add = |check: bool, count: usize| {
+            check.then(|| line.push(count.to_string()));
         };
-
-        self.args.lines.then(|| line_item_add(*num_lines));
-        self.args.words.then(|| line_item_add(*num_words));
-        self.args.bytes.then(|| line_item_add(*num_bytes));
-        self.args.chars.then(|| line_item_add(*num_chars));
+        line_item_add(self.args.lines, num_lines);
+        line_item_add(self.args.words, num_words);
+        line_item_add(self.args.bytes, num_bytes);
+        line_item_add(self.args.chars, num_chars);
 
         line.iter().for_each(|count| {
+            // GNU버전은 마지막이 9로 끝나면 공백이 추가된다.
+            // 더 명료한 방법이 있을 것 같지만 일단 이 방법으로 처리한다.
             if count.ends_with("9") && line.len() > 1 {
                 self.max = self.max.max(count.len() + 1);
             } else {
@@ -72,24 +82,29 @@ impl<'a> PrintFileInfos<'a> {
         self.fileinfos.push(line);
     }
 
+    /// 결과를 GNU버전에 맞춰서 출력한다.
     fn print(&self) {
-        // dbg!(&self.args);
         self.fileinfos.iter().for_each(|fileinfo| {
             fileinfo
                 .iter()
                 .enumerate()
                 // 벡터의 길이는 최소한 2이다.
+                // 마지막 경로명은 따로 처리한다.
                 .take(fileinfo.len() - 1)
                 .for_each(|(idx, count)| {
                     print!(
                         "{:>width$}{}",
                         count,
+                        // 마지막에 공백을 추가한다.
+                        // 경로명일 때는 공백을 추가하지 않는다.
                         if idx == fileinfo.len() - 2 { "" } else { " " },
                         width = self.max
                     );
                 });
             // 벡터의 길이가 0이 될 수 없다.
+            // `unwrap`을 사용할 수 있다.
             let filename = fileinfo.last().unwrap();
+            // 입력이 stdin일 때는 경로명을 출력하지 않는다.
             if filename == "-" {
                 println!();
             } else {
@@ -172,30 +187,36 @@ impl Args {
     }
 
     pub fn run(&self) -> Result<(), anyhow::Error> {
+        // 전체 집계를 담당하는 객체이다.
         let mut total = FileInfo {
             num_bytes: 0,
             num_chars: 0,
             num_lines: 0,
             num_words: 0,
         };
-        let mut printfileinfos = PrintFileInfos::new(self);
+        // 출력을 위한 객체이다.
+        let mut printfileinfos = FileInfoPrint::new(self);
         self.files.iter().try_for_each(|filename| {
             match open(filename) {
                 Err(e) => eprintln!("{filename}: {e}"),
                 Ok(_) => {
                     let count = count(open(filename)?)?;
+                    // 출력할 항목을 추가한다.
                     printfileinfos.append(filename, &count);
-                    (self.files.len() > 1).then(|| total.add(&count));
+                    // 파일의 수가 1보다 많을 때는 `total`을 갱신해야 한다.
+                    self.files.len().gt(&1).then(|| total.add(&count));
                 }
             }
 
             Result::<(), io::Error>::Ok(())
         })?;
 
+        // `total`을 출력하도록 추가한다.
         self.files.len().gt(&1).then(|| {
             printfileinfos.append("total", &total);
         });
 
+        // 결과를 출력한다.
         printfileinfos.print();
 
         Ok(())
