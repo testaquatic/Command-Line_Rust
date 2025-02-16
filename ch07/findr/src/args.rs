@@ -118,23 +118,31 @@ impl Args {
         self.paths.iter().for_each(|path| {
             WalkDir::new(path)
                 .into_iter()
-                .for_each(|entry| match entry {
-                    Err(e) => eprintln!("{e}"),
-                    Ok(entry) => {
-                        let names_match =
-                            self.names.iter().any(|name| check_file_name(&entry, name))
+                // `DirEntry`를 생성하지 못했을 때
+                .filter_map(|entry| match entry {
+                    Err(e) => {
+                        eprintln!("{e}");
+                        None
+                    }
+                    Ok(entry) => Some(entry),
+                })
+                // `names`와 일치하는지 확인한다.
+                .filter(|entry| {
+                    self.names.iter().any(|name| check_file_name(&entry, name))
                             // 벡터가 비어 있을 때는 `true`이다.
-                                || self.names.is_empty();
-                        let types_match = self
+                                || self.names.is_empty()
+                })
+                // `entry_types`와 일치하는지 확인한다.
+                .filter(|entry| {
+                    self
                             .entry_types
                             .iter()
                             .any(|entry_type| entry_type.check_file(&entry))
                             // 벡터가 비어 있을 때는 `true`이다.
-                            || self.entry_types.is_empty();
-                        (names_match && types_match)
-                            .then(|| println!("{}", entry.path().display()));
-                    }
+                            || self.entry_types.is_empty()
                 })
+                // `stdout`에 출력한다.
+                .for_each(|entry| println!("{}", entry.path().display()));
         });
 
         Ok(())
