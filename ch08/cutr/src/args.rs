@@ -136,7 +136,7 @@ impl Args {
                 // `Args::run`에서 `self.delimiter`에 대한 검사를 하므로 인덱스를 사용해도 문제가 없다.
                 .delimiter(self.delimiter.as_bytes()[0])
                 .from_reader(&mut file);
-            let print_string_vec = |vec: Vec<String>| println!("{}", vec.join(&self.delimiter));
+            let print_string_vec = |vec: Vec<&str>| println!("{}", vec.join(&self.delimiter));
 
             let header_record = reader.headers()?;
             let header_string = range.extract_fields(header_record);

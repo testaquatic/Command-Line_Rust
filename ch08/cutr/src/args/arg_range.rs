@@ -35,7 +35,7 @@ impl ArgRangeList {
             .collect()
     }
 
-    pub fn extract_fields(&self, record: &StringRecord) -> Vec<String> {
+    pub fn extract_fields<'a>(&self, record: &'a StringRecord) -> Vec<&'a str> {
         self.ranges
             .iter()
             .flat_map(|range| {
@@ -43,7 +43,6 @@ impl ArgRangeList {
                     .iter()
                     .skip(range.start)
                     .take(range.end - range.start)
-                    .map(String::from)
                     .collect::<Vec<_>>()
             })
             .collect()
