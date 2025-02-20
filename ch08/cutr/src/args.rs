@@ -1,6 +1,6 @@
 mod arg_range;
 
-use std::io::BufRead;
+use std::io::{self, BufRead};
 
 use arg_range::ArgRangeList;
 use clap::{value_parser, Arg, ArgGroup, Command, Parser};
@@ -131,36 +131,46 @@ impl Args {
 
     /// 파일을 처리하고 인쇄한다.
     fn process_file_and_print(&self, mut file: &mut dyn BufRead) -> Result<(), anyhow::Error> {
-        if let Some(range) = &self.extract.fields {
+        // 다소 중복되는 코드가 있지만 가독성이 나은 것 같다.
+        // --bytes를 처리한다.
+        if let Some(range) = &self.extract.bytes {
+            file.lines().try_for_each(|line| {
+                let line = line?;
+                let selected = range.extract_bytes(&line);
+                println!("{selected}");
+
+                Ok(())
+            })
+        // --chars 를 처리한다.
+        } else if let Some(range) = &self.extract.chars {
+            file.lines().try_for_each(|line| {
+                let line = line?;
+                let selected = range.extract_chars(&line);
+                println!("{selected}");
+
+                Ok(())
+            })
+        // -fields 를 처리한다.
+        } else if let Some(range) = &self.extract.fields {
             let mut reader = csv::ReaderBuilder::new()
                 // `Args::run`에서 `self.delimiter`에 대한 검사를 하므로 인덱스를 사용해도 문제가 없다.
                 .delimiter(self.delimiter.as_bytes()[0])
+                .has_headers(false)
                 .from_reader(&mut file);
-            let print_string_vec = |vec: Vec<&str>| println!("{}", vec.join(&self.delimiter));
 
-            let header_record = reader.headers()?;
-            let header_string = range.extract_fields(header_record);
-            print_string_vec(header_string);
+            let mut writer = csv::WriterBuilder::new()
+                // `Args::run`에서 `self.delimiter`에 대한 검사를 하므로 인덱스를 사용해도 문제가 없다.
+                .delimiter(self.delimiter.as_bytes()[0])
+                .from_writer(io::stdout().lock());
+
             reader.records().try_for_each(|record| {
                 let record = record?;
                 let selected = range.extract_fields(&record);
-                print_string_vec(selected);
-
-                Result::<(), anyhow::Error>::Ok(())
-            })?
+                writer.write_record(&selected).map_err(|e| e.into())
+            })
+        // clap이 정상적으로 작동했다면 도달할 수 없다.
+        } else {
+            unreachable!("Must have --fields, --bytes or --chars");
         }
-
-        file.lines().try_for_each(|line| {
-            let line = line?;
-            if let Some(range) = &self.extract.bytes {
-                let selected = range.extract_bytes(&line);
-                println!("{selected}");
-            } else if let Some(range) = &self.extract.chars {
-                let selected = range.extract_chars(&line);
-                println!("{selected}");
-            }
-
-            Ok(())
-        })
     }
 }
