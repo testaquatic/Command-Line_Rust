@@ -1,5 +1,6 @@
 use std::{
     io::BufRead,
+    mem,
     path::{Path, PathBuf},
 };
 
@@ -231,7 +232,8 @@ fn find_lines(
 
         // `true && false` || `false && true` 일 때
         if pattern.is_match(&line) ^ invert {
-            finds.push(line.clone());
+            // `mem::take`를 사용해서 불필요한 복사를 줄인다.
+            finds.push(mem::take(&mut line));
         }
 
         line.clear();
