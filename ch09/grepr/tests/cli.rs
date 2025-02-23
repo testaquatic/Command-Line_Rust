@@ -82,7 +82,7 @@ fn run(args: &[&str], expected_file: &str) -> Result<()> {
 // --------------------------------------------------
 #[test]
 fn empty_file() -> Result<()> {
-    run(&["foo", EMPTY], "tests/expected/empty.foo")
+    run(&["foo", EMPTY], "tests/expected/foo.empty.txt")
 }
 
 // --------------------------------------------------
