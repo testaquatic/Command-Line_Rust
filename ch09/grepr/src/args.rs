@@ -151,59 +151,16 @@ impl Args {
     fn get_file_list(&self) -> Vec<Result<PathBuf, anyhow::Error>> {
         let mut v = Vec::with_capacity(self.files.len());
 
-        let process_file_type = |filename: &Path, v: &mut Vec<Result<PathBuf, anyhow::Error>>| {
-            match filename.metadata() {
-                Ok(metadata) => match metadata.file_type() {
-                    // 파일일 때
-                    ft if ft.is_file() => {
-                        v.push(Ok(filename.to_path_buf()));
-                    }
-                    // 디렉터리일 때
-                    ft if ft.is_dir() => {
-                        v.push(Err(anyhow::anyhow!(
-                            "{} is a directory",
-                            filename.to_string_lossy()
-                        )));
-                    }
-                    // 파일이나 디렉터리가 모두 아닐 때
-                    _ => {
-                        v.push(Err(anyhow::anyhow!(
-                            "{} is not a file or directory",
-                            filename.to_string_lossy()
-                        )));
-                    }
-                },
-                Err(e) => {
-                    // 입력이 "-"일 때
-                    if filename == Path::new("-") {
-                        v.push(Ok(filename.to_path_buf()));
-                        return;
-                    }
-                    v.push(Err(anyhow::anyhow!("{}: {e}", filename.to_string_lossy())));
-                }
-            }
-        };
-
         // -r 일 때
         if self.recursive {
             self.files.iter().for_each(|file| {
                 let file_path = Path::new(file);
-                // 디렉터리일
-                if file_path.is_dir() {
-                    WalkDir::new(file_path)
-                        .into_iter()
-                        // 자기 자신은 제외한다.
-                        .skip(1)
-                        .for_each(|entry| match entry {
-                            Ok(entry) => process_file_type(entry.path(), &mut v),
-                            Err(e) => {
-                                v.push(Err(anyhow::anyhow!("{}: {e}", file)));
-                            }
-                        });
-                // 디렉터리가 아닐 때
-                } else {
-                    process_file_type(file_path, &mut v);
-                }
+                WalkDir::new(file_path)
+                    .into_iter()
+                    // 파일이 아닌 것은 제거한다.
+                    .flatten()
+                    .filter(|entry| entry.file_type().is_file())
+                    .for_each(|entry| v.push(Ok(entry.path().to_path_buf())))
             });
 
             return v;
@@ -211,7 +168,37 @@ impl Args {
         }
 
         self.files.iter().for_each(|file| {
-            process_file_type(Path::new(file), &mut v);
+            let file_path = Path::new(file);
+            // 먼저 STDIN을 처리한다.
+            if file_path == Path::new("-") {
+                v.push(Ok(file_path.to_path_buf()));
+                return;
+            }
+            match file_path.metadata() {
+                Ok(metadata) => {
+                    if metadata.is_file() {
+                        v.push(Ok(file_path.to_path_buf()));
+                    }
+                    // 파일이 디렉터리일 때
+                    else if metadata.is_dir() {
+                        v.push(Err(anyhow::anyhow!(
+                            "{} is a directory",
+                            file_path.display()
+                        )));
+                    }
+                    // 둘 다 아닐 때
+                    else {
+                        v.push(Err(anyhow::anyhow!(
+                            "{} is not a file or directory",
+                            file_path.display()
+                        )));
+                    }
+                }
+                // 메타데이터를 얻을 수 없을 때
+                Err(e) => {
+                    v.push(Err(anyhow::anyhow!("{}: {e}", file_path.display())));
+                }
+            }
         });
 
         v
