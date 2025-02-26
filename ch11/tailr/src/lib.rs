@@ -1,11 +1,7 @@
-use std::{
-    fs::File,
-    io::{self, BufRead, BufReader, Read, Seek},
-};
+use std::io::{self, BufRead, Read, Seek, SeekFrom};
 
 use args::{Args, TakeValue};
 use clap::Parser;
-use num::ToPrimitive;
 
 mod args;
 
@@ -19,13 +15,6 @@ pub fn run_derive() -> Result<(), anyhow::Error> {
     args.run()
 }
 
-fn process_line<T: BufRead + Seek>(mut f: T, start_idx: Option<u64>) -> Result<(), io::Error> {
-    f.seek(io::SeekFrom::Start(0))?;
-    print_lines(&mut f, start_idx)?;
-
-    Ok(())
-}
-
 fn count_lines_bytes<T: BufRead>(f: &mut T) -> Result<(i64, i64), io::Error> {
     f.bytes().try_fold((0, 0), |(lines, bytes), b_reuslt| {
         let b = b_reuslt?;
@@ -33,7 +22,10 @@ fn count_lines_bytes<T: BufRead>(f: &mut T) -> Result<(i64, i64), io::Error> {
     })
 }
 
-fn print_lines<T: BufRead>(f: &mut T, start_idx: Option<u64>) -> Result<(), io::Error> {
+fn print_lines<T: BufRead + Seek>(f: &mut T, start_idx: Option<u64>) -> Result<(), io::Error> {
+    // 파일 디스크립터가 처음을 가리키도록 설정한다.
+    f.seek(SeekFrom::Start(0))?;
+
     if let Some(start_index) = start_idx {
         let mut line = String::new();
         let mut loop_count = 0;
@@ -52,6 +44,19 @@ fn print_lines<T: BufRead>(f: &mut T, start_idx: Option<u64>) -> Result<(), io::
             loop_count += 1;
         }
     }
+
+    Ok(())
+}
+
+/// `start_idx`는 파일의 크기를 넘어서면 안된다.
+/// `get_start_index`를 사용해서 `start_idx`를 산출하면 문제를 방지할 수 있다.
+fn print_bytes<T: BufRead + Seek>(f: &mut T, start_idx: Option<u64>) -> Result<(), io::Error> {
+    if let Some(start_idx) = start_idx {
+        f.seek(SeekFrom::Start(start_idx))?;
+    }
+
+    let bytes = f.bytes().collect::<Result<Vec<u8>, io::Error>>()?;
+    print!("{}", String::from_utf8_lossy(&bytes));
 
     Ok(())
 }
@@ -82,6 +87,8 @@ fn get_start_index(take_value: &TakeValue, total_lines: i64) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::BufReader};
+
     use super::*;
 
     #[test]

@@ -2,7 +2,7 @@ use std::{fs::File, io::BufReader, str::FromStr};
 
 use clap::{Arg, ArgAction, ArgGroup, Command, Parser};
 
-use crate::{count_lines_bytes, get_start_index, process_line};
+use crate::{count_lines_bytes, get_start_index, print_bytes, print_lines};
 
 /// `tail`의 간단한 러스트 버전
 #[derive(Debug, Parser)]
@@ -95,32 +95,54 @@ impl Args {
     }
 
     pub fn run(&self) -> Result<(), anyhow::Error> {
-        self.files.iter().try_for_each(|filename| {
-            let header_print =
-                |start_idx: Option<u64>| !self.quiet && self.files.len() > 1 && start_idx.is_some();
+        let print_header = |filename: &str, is_header_print: bool| {
+            if is_header_print {
+                println!("==> {filename} <==");
+            }
+        };
+        let print_footer = |filename: &str, is_header_print: bool| {
+            // 이 블럭안에 진입하려면 `self.files.len()`은 최소한 1이다.
+            // 따라서 `unwrap`을 사용할 수 있다.
+            if is_header_print && self.files.last().unwrap() != filename {
+                println!();
+            }
+        };
 
-            let print_header = |filename: &str, is_header_print: bool| {
-                if is_header_print {
-                    println!("==> {filename} <==");
+        // 루프에 진입할 필요가 없다면 루프에 진입하지 않고 미리 반환한다.
+        if let Some(ref bytes_take) = self.counter.bytes {
+            if let TakeValue::TakeNum(0) = bytes_take {
+                return Ok(());
+            }
+        } else if let TakeValue::TakeNum(0) = self.counter.lines {
+            return Ok(());
+        }
+
+        self.files.iter().try_for_each(|filename| {
+            // 겹치는 코드를 통합했다.
+            let mut b_f = BufReader::new(match File::open(filename) {
+                Ok(f) => f,
+                // 파일을 여는데 실패했을 때는 오류를 인쇄하고 다음 파일로 넘어간다.
+                Err(e) => {
+                    eprintln!("{filename}: {e}");
+                    return Ok(());
                 }
-            };
-            let print_footer = |filename: &str, is_header_print: bool| {
-                // 이 블럭안에 진입하려면 `self.files.len()`은 최소한 1이다.
-                // 따라서 `unwrap`을 사용할 수 있다.
-                if is_header_print && self.files.last().unwrap() != filename {
-                    println!();
-                }
-            };
+            });
+            // 약간의 오버헤드가 있다.
+            let (total_lines, total_bytes) = count_lines_bytes(&mut b_f)?;
+
+            let is_header_print = !self.quiet && self.files.len() > 1;
 
             if let Some(bytes) = &self.counter.bytes {
-                unimplemented!()
-            } else {
-                let mut b_f = BufReader::new(File::open(filename)?);
-                let (total_lines, _) = count_lines_bytes(&mut b_f)?;
-                let start_idx = get_start_index(&self.counter.lines, total_lines);
-                let is_header_print = header_print(start_idx);
+                let start_idx = get_start_index(bytes, total_bytes);
                 print_header(filename, is_header_print);
-                if let Err(e) = process_line(b_f, start_idx) {
+                if let Err(e) = print_bytes(&mut b_f, start_idx) {
+                    eprintln!("{filename}: {e}");
+                }
+                print_footer(filename, is_header_print);
+            } else {
+                let start_idx = get_start_index(&self.counter.lines, total_lines);
+                print_header(filename, is_header_print);
+                if let Err(e) = print_lines(&mut b_f, start_idx) {
                     eprintln!("{filename}: {e}");
                 }
                 print_footer(filename, is_header_print);
