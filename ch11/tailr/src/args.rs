@@ -1,4 +1,8 @@
-use std::{fs::File, io::BufReader, str::FromStr};
+use std::{
+    fs::File,
+    io::{self, BufReader, BufWriter, Write},
+    str::FromStr,
+};
 
 use clap::{Arg, ArgAction, ArgGroup, Command, Parser};
 
@@ -94,20 +98,8 @@ impl Args {
         }
     }
 
+    /// 책의 내용일 일부 반영해서 코드를 단순화했다.
     pub fn run(&self) -> Result<(), anyhow::Error> {
-        let print_header = |filename: &str, is_header_print: bool| {
-            if is_header_print {
-                println!("==> {filename} <==");
-            }
-        };
-        let print_footer = |filename: &str, is_header_print: bool| {
-            // 이 블럭안에 진입하려면 `self.files.len()`은 최소한 1이다.
-            // 따라서 `unwrap`을 사용할 수 있다.
-            if is_header_print && self.files.last().unwrap() != filename {
-                println!();
-            }
-        };
-
         // 루프에 진입할 필요가 없다면 루프에 진입하지 않고 미리 반환한다.
         if let Some(ref bytes_take) = self.counter.bytes {
             if let TakeValue::TakeNum(0) = bytes_take {
@@ -117,39 +109,49 @@ impl Args {
             return Ok(());
         }
 
-        self.files.iter().try_for_each(|filename| {
-            // 겹치는 코드를 통합했다.
-            let mut b_f = BufReader::new(match File::open(filename) {
-                Ok(f) => f,
-                // 파일을 여는데 실패했을 때는 오류를 인쇄하고 다음 파일로 넘어간다.
-                Err(e) => {
-                    eprintln!("{filename}: {e}");
-                    return Ok(());
-                }
-            });
-            // 약간의 오버헤드가 있다.
-            let (total_lines, total_bytes) = count_lines_bytes(&mut b_f)?;
+        let mut b_stdout = BufWriter::new(io::stdout().lock());
 
-            let is_header_print = !self.quiet && self.files.len() > 1;
+        self.files
+            .iter()
+            .enumerate()
+            .try_for_each(|(file_num, filename)| {
+                // 겹치는 코드를 통합했다.
+                let mut b_f = BufReader::new(match File::open(filename) {
+                    Ok(f) => f,
+                    // 파일을 여는데 실패했을 때는 오류를 인쇄하고 다음 파일로 넘어간다.
+                    Err(e) => {
+                        eprintln!("{filename}: {e}");
+                        return Ok(());
+                    }
+                });
+                // 약간의 오버헤드가 있다.
+                let (total_lines, total_bytes) = count_lines_bytes(&mut b_f)?;
 
-            if let Some(bytes) = &self.counter.bytes {
-                let start_idx = get_start_index(bytes, total_bytes);
-                print_header(filename, is_header_print);
-                if let Err(e) = print_bytes(&mut b_f, start_idx) {
-                    eprintln!("{filename}: {e}");
+                let is_header_print = !self.quiet && self.files.len() > 1;
+                if is_header_print {
+                    writeln!(b_stdout, "==> {filename} <==")?
                 }
-                print_footer(filename, is_header_print);
-            } else {
-                let start_idx = get_start_index(&self.counter.lines, total_lines);
-                print_header(filename, is_header_print);
-                if let Err(e) = print_lines(&mut b_f, start_idx) {
-                    eprintln!("{filename}: {e}");
-                }
-                print_footer(filename, is_header_print);
-            }
 
-            Result::<(), anyhow::Error>::Ok(())
-        })
+                if let Some(bytes) = &self.counter.bytes {
+                    let start_idx = get_start_index(bytes, total_bytes);
+                    if let Err(e) = print_bytes(&mut b_f, start_idx, &mut b_stdout) {
+                        eprintln!("{filename}: {e}");
+                    }
+                } else {
+                    let start_idx = get_start_index(&self.counter.lines, total_lines);
+                    if let Err(e) = print_lines(&mut b_f, start_idx, &mut b_stdout) {
+                        eprintln!("{filename}: {e}");
+                    }
+                }
+
+                // self.files.len() >= 1 일때 루프에 진입할 수 있다.
+                // 따라서 1을 빼도 문제가 발생하지 않아야 한다.
+                if is_header_print && self.files.len() - 1 > file_num {
+                    writeln!(b_stdout)?;
+                }
+
+                Result::<(), anyhow::Error>::Ok(())
+            })
     }
 }
 

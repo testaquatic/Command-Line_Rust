@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, Read, Seek, SeekFrom};
+use std::io::{self, BufRead, Seek, SeekFrom, Write};
 
 use args::{Args, TakeValue};
 use clap::Parser;
@@ -15,71 +15,101 @@ pub fn run_derive() -> Result<(), anyhow::Error> {
     args.run()
 }
 
+/// 책의 코드가 더 효율적으로 보이므로 교체한다.
 fn count_lines_bytes<T: BufRead>(f: &mut T) -> Result<(i64, i64), io::Error> {
-    f.bytes().try_fold((0, 0), |(lines, bytes), b_reuslt| {
-        let b = b_reuslt?;
-        Ok((lines + if b == b'\n' { 1 } else { 0 }, bytes + 1))
-    })
+    let mut num_lines = 0;
+    let mut num_bytes = 0;
+    let mut buf = Vec::new();
+
+    loop {
+        let len = f.read_until(b'\n', &mut buf)?;
+        if len == 0 {
+            break;
+        }
+        num_lines += 1;
+        num_bytes += len as i64;
+        buf.clear();
+    }
+
+    Ok((num_lines, num_bytes))
 }
 
-fn print_lines<T: BufRead + Seek>(f: &mut T, start_idx: Option<u64>) -> Result<(), io::Error> {
+/// 코드를 명확하게 정리했다.
+fn print_lines<T: BufRead + Seek, U: Write>(
+    f: &mut T,
+    start_idx: Option<u64>,
+    writer: &mut U,
+) -> Result<(), io::Error> {
     // 파일 디스크립터가 처음을 가리키도록 설정한다.
     f.seek(SeekFrom::Start(0))?;
 
     if let Some(start_index) = start_idx {
-        let mut line = String::new();
-        let mut loop_count = 0;
-
-        // EOF를 만나면 .read_line()은 Ok(0)을 반환한다.
-        while loop_count < start_index && f.read_line(&mut line)? != 0 {
-            line.clear();
-            loop_count += 1;
-        }
+        // `start_idx`만큼의 줄을 소비한다.
+        f.lines().take(start_index as usize).for_each(|_| {});
 
         // 0이 반환되면 EOF이다.
+        // 파일 끝을 유지하기 위해서 `read_line`을 사용한다.
+        let mut line = String::new();
         while f.read_line(&mut line)? != 0 {
-            print!("{line}");
+            write!(writer, "{line}")?;
             line.clear();
-
-            loop_count += 1;
         }
     }
 
     Ok(())
 }
 
+/// 책의 코드가 더 효율적이므로 변경한다.
 /// `start_idx`는 파일의 크기를 넘어서면 안된다.
 /// `get_start_index`를 사용해서 `start_idx`를 산출하면 문제를 방지할 수 있다.
-fn print_bytes<T: BufRead + Seek>(f: &mut T, start_idx: Option<u64>) -> Result<(), io::Error> {
+fn print_bytes<T: BufRead + Seek, U: Write>(
+    f: &mut T,
+    start_idx: Option<u64>,
+    writer: &mut U,
+) -> Result<(), io::Error> {
     if let Some(start_idx) = start_idx {
         f.seek(SeekFrom::Start(start_idx))?;
+        let mut buffer = Vec::new();
+        f.read_to_end(&mut buffer)?;
+        if !buffer.is_empty() {
+            write!(writer, "{}", String::from_utf8_lossy(&buffer))?;
+        }
     }
-
-    let bytes = f.bytes().collect::<Result<Vec<u8>, io::Error>>()?;
-    print!("{}", String::from_utf8_lossy(&bytes));
 
     Ok(())
 }
 
 fn get_start_index(take_value: &TakeValue, total_lines: i64) -> Option<u64> {
     match take_value {
+        // 모든 것을 표시한다.
         TakeValue::PlusZero => {
+            // 전체 길이가 0이면 아무것도 인쇄하지 않는다.
             if total_lines == 0 {
                 None
+            // 처음부터 읽기 시작한다.
             } else {
                 Some(0)
             }
         }
-        TakeValue::TakeNum(num) => match num {
+        // 일부만 표시한다.
+        TakeValue::TakeNum(num) => match num.signum() {
+            // 0이면 아무것도 표시하지 않는다.
             0 => None,
-            &num if num > 0 => {
-                if num > total_lines {
+            // `num`이 양수이면 해당하는 줄부터 읽는다.
+            1 => {
+                // 전체 줄을 벗어났다.
+                if *num > total_lines {
                     None
+                // `num`이 0이거나 양수이다.
+                // 0인 때는 `None`을 반환한다.
                 } else {
-                    (num as u64).checked_sub(1)
+                    (*num as u64).checked_sub(1)
                 }
             }
-            &num if num < 0 => u64::try_from(total_lines + num).ok().or(Some(0)),
+            // `num`이 음수라면 파일의 끝부터 읽는다.
+            // 길이와 더한 이후에 음수일 때는 `Some(0)`를 반환한다.
+            -1 => u64::try_from(total_lines + num).ok().or(Some(0)),
+            // 도달할리 없지만 러스트 컴파일러가 오류를 반환한다.
             _ => unreachable!(),
         },
     }
