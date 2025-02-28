@@ -13,7 +13,7 @@ pub struct Args {
 
     /// 패턴
     #[arg(short = 'm', long, value_name = "PATTERN")]
-    pattern: Option<String>,
+    pub pattern: Option<String>,
 
     /// 대소문자 구분 없이 매칭
     #[arg(short, long, action = ArgAction::SetTrue)]
@@ -21,7 +21,7 @@ pub struct Args {
 
     /// 랜덤 시드
     #[arg(short, long, value_name = "SEED", value_parser = value_parser!(u64))]
-    seed: Option<u64>,
+    pub seed: Option<u64>,
 }
 
 impl Args {
