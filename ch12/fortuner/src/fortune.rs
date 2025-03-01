@@ -30,7 +30,7 @@ impl Fortunes {
 
             // EOF를 만나면 0이 반환된다.
             while f.read_until(b'%', &mut string_buf)? != 0 {
-                let text = String::from_utf8_lossy(&mut string_buf);
+                let text = String::from_utf8_lossy(&string_buf);
                 // 조기에 `String`을 생성한다.
                 // .read_until()은 구분자를 포함한다.
                 let text_trim = text.trim_end_matches('%').trim().to_string();

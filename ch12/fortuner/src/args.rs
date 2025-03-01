@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, ffi::OsStr, io, path::PathBuf};
+use std::{ffi::OsStr, io, path::PathBuf};
 
 use clap::{Arg, ArgAction, Command, Parser, value_parser};
 use regex::{Regex, RegexBuilder};
@@ -83,11 +83,11 @@ impl Args {
     }
 
     pub fn find_files(&self) -> Result<Vec<PathBuf>, io::Error> {
-        let files_set = self
+        let mut files_vec = self
             .sources
             .iter()
             .flat_map(|source| {
-                WalkDir::new(&source)
+                WalkDir::new(source)
                     .into_iter()
                     .map(|entry_result| Result::<PathBuf, io::Error>::Ok(entry_result?.into_path()))
             })
@@ -100,9 +100,13 @@ impl Args {
 
                 true
             })
-            .collect::<Result<BTreeSet<_>, _>>()?;
+            // `BTreeSet`보다 책의 `Vec`이 더 효율적인 것 같다.
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(files_set.into_iter().collect())
+        files_vec.sort();
+        files_vec.dedup();
+
+        Ok(files_vec)
     }
 }
 
