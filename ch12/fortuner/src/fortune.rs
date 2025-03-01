@@ -1,20 +1,19 @@
 use std::{
     fs::File,
-    io::{self, BufRead, BufReader, Read},
+    io::{BufRead, BufReader},
     path::PathBuf,
 };
 
 use rand::{
-    Rng, RngCore, SeedableRng,
+    RngCore, SeedableRng,
     distr::{Distribution, slice::Choose},
-    rngs::{StdRng, ThreadRng},
-    seq::SliceRandom,
+    rngs::StdRng,
 };
 use regex::Regex;
 
 #[derive(Debug)]
 pub struct Fortune {
-    pub source: String,
+    pub source: PathBuf,
     pub text: String,
 }
 
@@ -40,12 +39,12 @@ impl Fortunes {
                 if text_trim.is_empty() {
                     continue;
                 }
+                if !path.is_file() {
+                    anyhow::bail!("{} is not a file!", path.display());
+                }
+
                 let fortune = Fortune {
-                    source: path
-                        .file_name()
-                        .ok_or(anyhow::anyhow!("{} is not a file!", path.display()))?
-                        .to_string_lossy()
-                        .to_string(),
+                    source: path.to_owned(),
                     text: text_trim.to_string(),
                 };
                 fortunes.0.push(fortune);
@@ -79,6 +78,7 @@ impl Fortunes {
 
 #[cfg(test)]
 mod tests {
+
     use crate::fortune::Fortune;
 
     use super::Fortunes;
@@ -112,17 +112,17 @@ mod tests {
         // Create a slice of fortunes
         let fortunes = Fortunes(vec![
             Fortune {
-                source: "fortunes".to_string(),
+                source: "fortunes".into(),
                 text: "You cannot achieve the impossible without \
                         attempting the absurd."
                     .to_string(),
             },
             Fortune {
-                source: "fortunes".to_string(),
+                source: "fortunes".into(),
                 text: "Assumption is the mother of all screw-ups.".to_string(),
             },
             Fortune {
-                source: "fortunes".to_string(),
+                source: "fortunes".into(),
                 text: "Neckties strangle clear thinking.".to_string(),
             },
         ]);

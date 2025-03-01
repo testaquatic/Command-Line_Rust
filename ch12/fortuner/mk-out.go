@@ -52,7 +52,7 @@ func main() {
 	}
 
 	InDir = filepath.Join(workingDir, "tests/inputs")
-	OutDir = filepath.Join(workingDir, "tests/outputs")
+	OutDir = filepath.Join(workingDir, "tests/expected")
 
 	info, err := os.Stat(OutDir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -90,10 +90,10 @@ func main() {
 	args = slices.Concat(args, files)
 	makeOutFile("twain_lower", args...)
 
-	args = []string{"-m", "yogi berra", "-i"}
+	args = []string{"-i", "-m", "yogi berra"}
 	args = slices.Concat(args, files)
 	makeOutFile("berra_lower_i", args...)
-	args = []string{"-m", "mark twain", "-i"}
+	args = []string{"-i", "-m", "mark twain"}
 	args = slices.Concat(args, files)
 	makeOutFile("twain_lower_i", args...)
 }
