@@ -1,5 +1,8 @@
 use calr::run;
 
 fn main() {
-    run();
+    if let Err(e) = run() {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
 }
