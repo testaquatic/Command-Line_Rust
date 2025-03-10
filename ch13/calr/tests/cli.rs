@@ -60,11 +60,7 @@ fn dies_month_0() -> Result<()> {
     assert_eq!(stdout, "");
 
     let stderr = String::from_utf8(output.stderr).expect("invalid UTF-8");
-    assert!(
-        stderr
-            .trim()
-            .contains(r#"month "0" not in the range 1 through 12"#)
-    );
+    assert_eq!(stderr.trim(), r#"month "0" not in the range 1 through 12"#);
 
     Ok(())
 }
@@ -79,11 +75,7 @@ fn dies_month_13() -> Result<()> {
     assert!(!output.status.success());
 
     let stderr = String::from_utf8(output.stderr).expect("invalid UTF-8");
-    assert!(
-        stderr
-            .trim()
-            .contains(r#"month "13" not in the range 1 through 12"#)
-    );
+    assert_eq!(stderr.trim(), r#"month "13" not in the range 1 through 12"#);
     Ok(())
 }
 
@@ -97,7 +89,7 @@ fn dies_invalid_month() -> Result<()> {
     assert!(!output.status.success());
 
     let stderr = String::from_utf8(output.stderr).expect("invalid UTF-8");
-    assert!(stderr.trim().contains(r#"Invalid month "foo""#));
+    assert_eq!(stderr.trim(), r#"Invalid month "foo""#);
     Ok(())
 }
 
@@ -199,7 +191,7 @@ fn default_one_month() -> Result<()> {
     let stdout = String::from_utf8(out.stdout.clone())?;
     let lines: Vec<_> = stdout.split('\n').collect();
     assert_eq!(lines.len(), 9);
-    assert_eq!(lines[0].len(), 22);
+    assert_eq!(lines[0].len(), 20);
     Ok(())
 }
 
@@ -233,6 +225,6 @@ fn year() -> Result<()> {
     let cmd = Command::cargo_bin(PRG)?.arg("-y").assert().success();
     let stdout = String::from_utf8(cmd.get_output().stdout.clone())?;
     let lines: Vec<&str> = stdout.split('\n').collect();
-    assert_eq!(lines.len(), 37);
+    assert_eq!(lines.len(), 35);
     Ok(())
 }

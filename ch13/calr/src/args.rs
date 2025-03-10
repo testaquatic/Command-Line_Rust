@@ -1,30 +1,18 @@
-use chrono::{Datelike, Local};
-use clap::{Arg, ArgAction, Command, Parser, value_parser};
+use clap::{Arg, Command, value_parser};
 
-use crate::month::Month;
-
-#[derive(Debug, Parser)]
-#[command(name = "calr", author, version, about)]
+#[derive(Debug)]
 pub struct Args {
-    /// 연도 (1-9999)
-    #[arg(value_name = "YEAR", value_parser = value_parser!(i32).range(1..=9999))]
     pub year: Option<i32>,
-
-    /// 달의 이름이나 숫자 (1-12)
-    #[arg(value_name = "MONTH", short, value_parser = value_parser!(Month))]
-    pub month: Option<Month>,
-
-    /// 올해를 모두 나타낸다.
-    #[arg(short='y', long = "year", action = ArgAction::SetTrue, conflicts_with_all = ["month", "year"])]
-    show_current_year: bool,
+    pub month: Option<String>,
+    pub show_current_year: bool,
 }
 
 impl Args {
-    fn parse_raw() -> Args {
+    pub fn parse() -> Args {
         let matches = Command::new("calr")
-            .author("TestAquatic")
-            .about("`cal`의 간단한 러스트 구현")
             .version("0.1.0")
+            .author("TestAquatic")
+            .about("간단한 러스트 버전 `cal`")
             .arg(
                 Arg::new("year")
                     .value_name("YEAR")
@@ -35,16 +23,15 @@ impl Args {
                 Arg::new("month")
                     .short('m')
                     .value_name("MONTH")
-                    .value_parser(value_parser!(Month))
-                    .help("달의 이름이나 숫자 (1-12)"),
+                    .help("달의 영문 이름이나 숫자 (1-12)"),
             )
             .arg(
                 Arg::new("show_current_year")
                     .short('y')
                     .long("year")
-                    .help("올해를 모두 나타낸다")
-                    .conflicts_with_all(["month", "year"])
-                    .action(ArgAction::SetTrue),
+                    .action(clap::ArgAction::SetTrue)
+                    .help("현재 연도 표시")
+                    .conflicts_with_all(["year", "month"]),
             )
             .get_matches();
 
@@ -53,22 +40,5 @@ impl Args {
             month: matches.get_one("month").cloned(),
             show_current_year: matches.get_flag("show_current_year"),
         }
-    }
-
-    pub fn parse() -> Args {
-        let mut args = Args::parse_raw();
-
-        let today = Local::now().date_naive();
-
-        if args.show_current_year {
-            args.month = None;
-            args.year = Some(today.year());
-        } else if args.month.is_none() && args.year.is_none() {
-            args.month = Some(Month::new(today.month()));
-            args.year = Some(today.year());
-        }
-        args.year = args.year.or(Some(today.year()));
-
-        args
     }
 }

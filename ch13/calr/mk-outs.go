@@ -12,7 +12,7 @@ import (
 
 const OUTDIR = "tests/expected"
 
-var fileDelete = new(sync.WaitGroup)
+var fileDelete sync.WaitGroup
 
 func main() {
 	_, err := os.Stat(OUTDIR)
@@ -44,7 +44,7 @@ func main() {
 }
 
 func run_ccal(outfile string, args ...string) {
-	cmd := exec.Command("ccal", args...)
+	cmd := exec.Command("cal", args...)
 	_, err := os.Stat(outfile)
 	runEnd := make(chan struct{})
 	if errors.Is(err, os.ErrNotExist) {
