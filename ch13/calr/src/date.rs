@@ -53,6 +53,7 @@ pub fn format_month(
     let today = if year == today.year() && month == today.month() {
         today.day()
     } else {
+        // 날짜는 0이 될 수 없다.
         0
     };
     let mut month_vec = Vec::with_capacity(8);
