@@ -7,7 +7,7 @@ use std::{
 use args::Args;
 use chrono::{DateTime, Local};
 use tabular::{Row, Table};
-use users::get_user_by_uid;
+use users::{get_group_by_gid, get_user_by_uid};
 
 mod args;
 
@@ -57,13 +57,16 @@ fn format_output(paths: &[PathBuf]) -> Result<String, anyhow::Error> {
     for path in paths {
         let meta = fs::metadata(path)?;
         let mode = meta.permissions().mode();
-        let username = get_user_by_uid(meta.uid())
+        let uid = meta.uid();
+        let username = get_user_by_uid(uid)
             .map(|u| u.name().to_string_lossy().to_string())
-            .unwrap_or_default();
-        let groupname = get_user_by_uid(meta.gid())
-            .map(|u| u.name().to_string_lossy().to_string())
-            .unwrap_or_default();
-        let modified = DateTime::<Local>::from(meta.modified()?).format("%b %d %R");
+            .unwrap_or(uid.to_string());
+
+        let gid = meta.gid();
+        let groupname = get_group_by_gid(gid)
+            .map(|g| g.name().to_string_lossy().to_string())
+            .unwrap_or(gid.to_string());
+        let modified = DateTime::<Local>::from(meta.modified()?).format("%b %d %y %R");
 
         table.add_row(
             Row::new()
